@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { SplashScreen, MainScreen, QuestionListScreen, QuestionDetailScreen } from './src/screens';
+import { SplashScreen, MainScreen, QuestionListScreen, QuestionDetailScreen, WriteQuestionScreen } from './src/screens';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +29,7 @@ export default function App() {
           <Stack.Screen name="Main" component={MainScreen} />
           <Stack.Screen name="QuestionList" component={QuestionListScreen} />
           <Stack.Screen name="QuestionDetail" component={QuestionDetailScreen} />
+          <Stack.Screen name="WriteQuestion" component={WriteQuestionScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

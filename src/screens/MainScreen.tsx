@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { MOCK_QUESTIONS, Question } from '../data/mockData';
-import { Heart, MessageCircle, ChevronRight, Flame } from 'lucide-react-native';
+import { Heart, MessageCircle, ChevronRight, Flame, PenLine } from 'lucide-react-native';
 import { isToday, subDays, startOfDay } from 'date-fns';
 
 export const MainScreen = ({ navigation }: any) => {
@@ -135,6 +135,16 @@ export const MainScreen = ({ navigation }: any) => {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {/* 글쓰기 플로팅 버튼 */}
+            <View style={styles.fabContainer}>
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() => navigation.navigate('WriteQuestion')}
+                >
+                    <PenLine size={24} color={theme.colors.surface} />
+                </TouchableOpacity>
+            </View>
         </SafeAreaView>
     );
 };
@@ -284,5 +294,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: theme.colors.textLight,
         textAlign: 'center',
+    },
+    fabContainer: {
+        position: 'absolute',
+        bottom: 100,
+        right: 20,
+    },
+    fab: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
     },
 });

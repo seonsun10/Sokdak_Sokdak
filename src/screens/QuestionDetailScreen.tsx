@@ -1,13 +1,14 @@
 // Question Detail Screen
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard, Alert } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { MOCK_QUESTIONS, MOCK_COMMENTS, Comment } from '../data/mockData';
 import { ChevronLeft, MessageCircle, Heart, Trash2, ArrowUp, List, Send } from 'lucide-react-native';
 import { format } from 'date-fns';
 
 export const QuestionDetailScreen = ({ route, navigation }: any) => {
+    const insets = useSafeAreaInsets();
     const { questionId } = route.params;
     const question = MOCK_QUESTIONS.find(q => q.id === questionId);
 
@@ -104,6 +105,21 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
         listRef.current?.scrollToOffset({ offset: 0, animated: true });
     };
 
+    const handleEditQuestion = () => {
+        Alert.alert('알림', '질문 수정 화면으로 이동합니다.');
+    };
+
+    const handleDeleteQuestion = () => {
+        Alert.alert(
+            '질문 삭제',
+            '정말로 이 질문을 삭제하시겠습니까?',
+            [
+                { text: '취소', style: 'cancel' },
+                { text: '삭제', style: 'destructive', onPress: () => navigation.goBack() }
+            ]
+        );
+    };
+
     const renderHeader = () => {
         if (!question) return null;
         return (
@@ -194,14 +210,20 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <ChevronLeft size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>질문 상세</Text>
-                <View style={{ width: 40 }} />
+                <View style={styles.headerRight}>
+                    <TouchableOpacity onPress={handleEditQuestion} style={styles.headerActionBtn}>
+                        <Text style={styles.headerActionText}>수정</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleDeleteQuestion} style={styles.headerActionBtn}>
+                        <Text style={[styles.headerActionText, { color: theme.colors.error }]}>삭제</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 60 + insets.top : 0}
             >
                 <FlatList
                     ref={listRef}
@@ -278,6 +300,20 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: theme.colors.text,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    headerActionBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    headerActionText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: theme.colors.textLight,
     },
     listContent: {
         backgroundColor: theme.colors.background,
@@ -462,6 +498,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.surface,
         borderTopWidth: 1,
         borderTopColor: theme.colors.border,
+        paddingBottom: Platform.OS === 'ios' ? theme.spacing.md : theme.spacing.md,
     },
     textInput: {
         flex: 1,
