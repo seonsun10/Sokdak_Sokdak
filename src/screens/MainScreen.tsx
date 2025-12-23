@@ -4,14 +4,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { MOCK_QUESTIONS, Question } from '../data/mockData';
 import { Heart, MessageCircle, ChevronRight, Flame } from 'lucide-react-native';
+import { isToday, subDays, startOfDay } from 'date-fns';
 
 export const MainScreen = ({ navigation }: any) => {
     const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
 
-    // 첫 번째 섹션 (인기 질문) - 댓글 수 기준 정렬
-    const popularQuestions = [...MOCK_QUESTIONS]
-        .sort((a, b) => b.commentCount - a.commentCount)
-        .slice(0, 5);
+    // 인기 질문 필터링 로직
+    const getPopularQuestions = () => {
+        const now = new Date();
+        const filtered = MOCK_QUESTIONS.filter(q => {
+            if (activeTab === 'today') {
+                return isToday(q.createdAt);
+            } else if (activeTab === 'week') {
+                return q.createdAt >= subDays(startOfDay(now), 7);
+            } else if (activeTab === 'month') {
+                return q.createdAt >= subDays(startOfDay(now), 30);
+            }
+            return true;
+        });
+
+        // 댓글 수 기준 정렬 후 상위 5개
+        return [...filtered]
+            .sort((a, b) => b.commentCount - a.commentCount)
+            .slice(0, 5);
+    };
+
+    const popularQuestions = getPopularQuestions();
+    const hotQuestionId = popularQuestions.length > 0 ? popularQuestions[0].id : null;
 
     // 두 번째 섹션 (최신 질문) - 날짜 기준 정렬
     const recentQuestions = [...MOCK_QUESTIONS]
@@ -22,7 +41,7 @@ export const MainScreen = ({ navigation }: any) => {
         <TouchableOpacity
             key={item.id}
             style={styles.questionCard}
-            onPress={() => { }}
+            onPress={() => navigation.navigate('QuestionDetail', { questionId: item.id })}
         >
             <View style={styles.questionHeader}>
                 <Text style={styles.questionTitle} numberOfLines={1}>{item.title}</Text>
@@ -75,7 +94,13 @@ export const MainScreen = ({ navigation }: any) => {
                     </View>
 
                     <View style={styles.listContainer}>
-                        {popularQuestions.map((q, index) => renderQuestionItem(q, index === 0))}
+                        {popularQuestions.length > 0 ? (
+                            popularQuestions.map((q) => renderQuestionItem(q, q.id === hotQuestionId))
+                        ) : (
+                            <View style={styles.emptyCard}>
+                                <Text style={styles.emptyText}>선택한 기간에 등록된 질문이 없어요. 🌸</Text>
+                            </View>
+                        )}
                     </View>
 
                     <TouchableOpacity
@@ -244,5 +269,20 @@ const styles = StyleSheet.create({
     divider: {
         height: 12,
         backgroundColor: theme.colors.background,
+    },
+    emptyCard: {
+        padding: theme.spacing.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.background,
+        borderRadius: theme.borderRadius.md,
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: theme.colors.textLight,
+        textAlign: 'center',
     },
 });
