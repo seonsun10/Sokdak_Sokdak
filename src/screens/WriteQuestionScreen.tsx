@@ -7,17 +7,18 @@ import {
     TouchableOpacity,
     ScrollView,
     KeyboardAvoidingView,
-    Platform,
-    Alert
+    Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { ChevronLeft, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MOCK_QUESTIONS, Question } from '../data/mockData';
+import { CustomModal } from '../components/CustomModal';
 
-export const WriteQuestionScreen = ({ navigation }: any) => {
+export const WriteQuestionScreen = ({ route, navigation }: any) => {
     const insets = useSafeAreaInsets();
+
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [tagInput, setTagInput] = useState('');
@@ -25,7 +26,11 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
 
     // 유효성 검사 에러 상태
     const [errors, setErrors] = useState({ title: false, content: false });
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [focusedField, setFocusedField] = useState<'title' | 'content' | 'tag' | null>(null);
+
+    // 커스텀 모달 상태
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ title: '', message: '', onConfirm: () => {} });
 
     // 포커스 제어를 위한 Ref
     const titleRef = useRef<TextInput>(null);
@@ -39,12 +44,22 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
         }
 
         if (tags.length >= 5) {
-            Alert.alert('알림', '태그는 최대 5개까지만 추가할 수 있습니다.');
+            setModalConfig({
+                title: '알림',
+                message: '태그는 최대 5개까지만 추가할 수 있습니다.',
+                onConfirm: () => setModalVisible(false)
+            });
+            setModalVisible(true);
             return;
         }
 
         if (tags.includes(trimmedTag)) {
-            Alert.alert('알림', '이미 추가된 태그입니다.');
+            setModalConfig({
+                title: '알림',
+                message: '이미 추가된 태그입니다.',
+                onConfirm: () => setModalVisible(false)
+            });
+            setModalVisible(true);
             setTagInput('');
             return;
         }
@@ -58,15 +73,12 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
     };
 
     const handleComplete = async () => {
-        // 기존 에러 및 메시지 초기화
+        // 기존 에러 초기화
         setErrors({ title: false, content: false });
-        setErrorMessage(null);
 
         let hasError = false;
         const newErrors = { title: false, content: false };
 
-        // 내용부터 검사 (제목이 비었을 때 제목으로 포커스가 가야하므로 역순 혹은 로직 순서 중요)
-        // 여기서는 위에서부터 검사하여 첫 번째 비어있는 곳에 포커스
         if (!title.trim()) {
             newErrors.title = true;
             hasError = true;
@@ -78,7 +90,6 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
 
         if (hasError) {
             setErrors(newErrors);
-            // 첫 번째 에러 요소에 포커스
             if (newErrors.title) {
                 titleRef.current?.focus();
             } else if (newErrors.content) {
@@ -87,13 +98,8 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
             return;
         }
 
-        // 등록 로직 시뮬레이션
         try {
-            // 실패 시뮬레이션 (예: 특정 키워드가 있으면 실패)
-            if (title.includes('error')) {
-                throw new Error('등록에 실패했습니다.');
-            }
-
+            // 등록 로직
             const newQuestion: Question = {
                 id: `new-${Date.now()}`,
                 title: title.trim(),
@@ -104,14 +110,24 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
                 tags: tags
             };
 
-            // 데이터 추가 (메모리 상)
             MOCK_QUESTIONS.unshift(newQuestion);
-
-            // 성공 시 Alert 없이 바로 상세 화면으로 이동 (Replace로 스택 교체 추천)
-            navigation.replace('QuestionDetail', { questionId: newQuestion.id });
-
+            
+            setModalConfig({
+                title: '등록 완료',
+                message: '새로운 질문이 등록되었습니다.',
+                onConfirm: () => {
+                    setModalVisible(false);
+                    navigation.replace('QuestionDetail', { questionId: newQuestion.id });
+                }
+            });
+            setModalVisible(true);
         } catch (e) {
-            setErrorMessage('게시글 등록에 실패했습니다. 잠시 후 다시 시도해주세요.');
+            setModalConfig({
+                title: '오류',
+                message: '게시글 등록에 실패했습니다.',
+                onConfirm: () => setModalVisible(false)
+            });
+            setModalVisible(true);
         }
     };
 
@@ -127,12 +143,12 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
             </View>
 
-            {/* 에러 메시지 표시 영역 */}
-            {errorMessage && (
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{errorMessage}</Text>
-                </View>
-            )}
+            <CustomModal
+                visible={modalVisible}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                onConfirm={modalConfig.onConfirm}
+            />
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
@@ -146,37 +162,54 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
                             ref={titleRef}
                             style={[
                                 styles.titleInput,
-                                errors.title && styles.inputError // 에러 시 스타일 적용
+                                errors.title && styles.inputError,
+                                focusedField === 'title' && !errors.title && styles.inputFocused
                             ]}
                             placeholder="제목을 입력하세요"
                             placeholderTextColor={theme.colors.textLight}
                             value={title}
                             onChangeText={(text) => {
                                 setTitle(text);
-                                if (text.trim()) setErrors(prev => ({ ...prev, title: false })); // 입력 시 에러 해제
+                                if (errors.title) setErrors(prev => ({ ...prev, title: false }));
                             }}
+                            onFocus={() => setFocusedField('title')}
+                            onBlur={() => setFocusedField(null)}
                             maxLength={50}
+                            underlineColorAndroid="transparent"
                         />
                     </View>
 
                     <View style={styles.inputSection}>
                         <Text style={[styles.label, errors.content && styles.errorLabel]}>내용</Text>
-                        <TextInput
-                            ref={contentRef}
-                            style={[
-                                styles.contentInput,
-                                errors.content && styles.inputError // 에러 시 스타일 적용
-                            ]}
-                            placeholder="어떤 고민이 있으신가요? 자세히 적어주세요."
-                            placeholderTextColor={theme.colors.textLight}
-                            value={content}
-                            onChangeText={(text) => {
-                                setContent(text);
-                                if (text.trim()) setErrors(prev => ({ ...prev, content: false })); // 입력 시 에러 해제
-                            }}
-                            multiline
-                            textAlignVertical="top"
-                        />
+                        <View style={styles.contentInputContainer}>
+                            <TextInput
+                                ref={contentRef}
+                                style={[
+                                    styles.contentInput,
+                                    errors.content && styles.inputError,
+                                    focusedField === 'content' && !errors.content && styles.inputFocused
+                                ]}
+                                placeholder="어떤 고민이 있으신가요? 자세히 적어주세요."
+                                placeholderTextColor={theme.colors.textLight}
+                                value={content}
+                                onChangeText={(text) => {
+                                    setContent(text);
+                                    if (errors.content) setErrors(prev => ({ ...prev, content: false }));
+                                }}
+                                onFocus={() => setFocusedField('content')}
+                                onBlur={() => setFocusedField(null)}
+                                multiline
+                                textAlignVertical="top"
+                                underlineColorAndroid="transparent"
+                                maxLength={2000}
+                            />
+                            <Text style={[
+                                styles.charCount,
+                                content.length >= 2000 && styles.charCountMax
+                            ]}>
+                                {content.length}/2000
+                            </Text>
+                        </View>
                     </View>
 
                     <View style={styles.inputSection}>
@@ -185,15 +218,19 @@ export const WriteQuestionScreen = ({ navigation }: any) => {
                             <TextInput
                                 style={[
                                     styles.tagInput,
-                                    tags.length >= 5 && styles.disabledInput
+                                    tags.length >= 5 && styles.disabledInput,
+                                    focusedField === 'tag' && styles.inputFocused
                                 ]}
-                                placeholder={tags.length >= 5 ? "태그는 5개까지만 입력 가능합니다" : "태그를 입력해주세요."}
+                                placeholder={tags.length >= 5 ? "해시태그는 5개까지만 입력 가능합니다" : "해시태그를 입력해주세요."}
                                 placeholderTextColor={theme.colors.textLight}
                                 value={tagInput}
                                 onChangeText={setTagInput}
+                                onFocus={() => setFocusedField('tag')}
+                                onBlur={() => setFocusedField(null)}
                                 onSubmitEditing={handleAddTag}
                                 editable={tags.length < 5}
                                 autoCapitalize="none"
+                                underlineColorAndroid="transparent"
                             />
                         </View>
 
@@ -250,16 +287,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 14,
     },
-    errorContainer: {
-        backgroundColor: '#FFEBEE',
-        padding: theme.spacing.sm,
-        alignItems: 'center',
-    },
-    errorText: {
-        color: '#D32F2F',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
     container: {
         flex: 1,
     },
@@ -276,7 +303,7 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.sm,
     },
     errorLabel: {
-        color: theme.colors.primary, // 에러 시 라벨도 브랜드 컬러로 강조
+        color: theme.colors.primary,
     },
     titleInput: {
         fontSize: 16,
@@ -287,21 +314,38 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: theme.colors.border,
     },
+    contentInputContainer: {
+        position: 'relative',
+    },
     contentInput: {
         fontSize: 16,
         minHeight: 200,
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.md,
         padding: theme.spacing.md,
+        paddingBottom: 40,
         color: theme.colors.text,
         borderWidth: 1,
         borderColor: theme.colors.border,
     },
+    charCount: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        fontSize: 12,
+        color: theme.colors.textLight,
+    },
+    charCountMax: {
+        color: theme.colors.hot,
+        fontWeight: 'bold',
+    },
     inputError: {
+        borderColor: theme.colors.hot,
+        borderWidth: 1.5,
+    },
+    inputFocused: {
         borderColor: theme.colors.primary,
-        borderBottomColor: theme.colors.primary,
-        borderWidth: 2, // 더 진하게
-        borderBottomWidth: 2,
+        borderWidth: 1.5,
     },
     tagInputContainer: {
         flexDirection: 'row',

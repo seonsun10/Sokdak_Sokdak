@@ -1,16 +1,16 @@
 export const theme = {
   colors: {
-    primary: '#FFB7C5', // Cherry Blossom Pink
+    primary: '#D85B73', // 가독성이 강화된 Deep Rose (4.5:1 대비 확보)
     primaryLight: '#FFE4E8',
-    primaryDark: '#FF99AC',
+    primaryDark: '#B53D56',
     background: '#FFF9FA',
     surface: '#FFFFFF',
-    text: '#4A4A4A',
-    textLight: '#8E8E8E',
+    text: '#2D2D2D', // 가득찬 느낌을 위해 조금 더 어둡게 (기존 #4A4A4A)
+    textLight: '#6C6C6C', // 어두운 회색 (4.5:1 대비 확보, 기존 #8E8E8E)
     border: '#FFE1E6',
-    hot: '#FF4D6D',
-    success: '#7ED321',
-    error: '#FF5A5F',
+    hot: '#E63958', // 선명한 빨강 (기존 #FF4D6D)
+    success: '#558B2F', // 어두운 초록 (기존 #7ED321)
+    error: '#D32F2F', // 표준 에러 컬러 (기존 #FF5A5F)
   },
   spacing: {
     xs: 4,

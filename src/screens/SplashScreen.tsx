@@ -8,9 +8,9 @@ export const SplashScreen = () => {
             <View style={styles.logoContainer}>
                 {/* 임시 로고 텍스트 */}
                 <Text style={styles.logoText}>🌸</Text>
-                <Text style={styles.brandName}>CoupleQ</Text>
+                <Text style={styles.brandName}>속닥속닥</Text>
             </View>
-            <Text style={styles.loadingText}>봄바람과 함께 데이터를 불러오는 중...</Text>
+            <Text style={styles.loadingText}>속닥속닥, 우리들만의 이야기를 준비하는 중...</Text>
         </View>
     );
 };

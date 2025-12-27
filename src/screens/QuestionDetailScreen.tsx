@@ -1,11 +1,12 @@
 // Question Detail Screen
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { MOCK_QUESTIONS, MOCK_COMMENTS, Comment } from '../data/mockData';
 import { ChevronLeft, MessageCircle, Heart, Trash2, ArrowUp, List, Send } from 'lucide-react-native';
 import { format } from 'date-fns';
+import { CustomModal } from '../components/CustomModal';
 
 export const QuestionDetailScreen = ({ route, navigation }: any) => {
     const insets = useSafeAreaInsets();
@@ -18,6 +19,16 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
     const [loadingMore, setLoadingMore] = useState(false);
     const [page, setPage] = useState(1);
     const [inputText, setInputText] = useState('');
+
+    // 커스텀 모달 상태
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ 
+        title: '', 
+        message: '', 
+        onConfirm: () => {}, 
+        onCancel: undefined as (() => void) | undefined,
+        cancelText: '취소'
+    });
 
     const listRef = useRef<FlatList>(null);
 
@@ -62,7 +73,6 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
         if (loadingMore || displayedComments.length >= allComments.length) return;
 
         setLoadingMore(true);
-        // 즉각적인 반응을 위해 지연시간을 대폭 줄임
         setTimeout(() => {
             const nextBatch = allComments.slice(page * 10, (page + 1) * 10);
             if (nextBatch.length > 0) {
@@ -79,7 +89,7 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
         const newComment: Comment = {
             id: `new-${Date.now()}`,
             questionId,
-            author: '본인사용자', // 로그인 연동 전 임시 ID
+            author: '본인사용자',
             content: inputText.trim(),
             likes: 0,
             isLiked: false,
@@ -88,43 +98,35 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
         };
 
         const updatedAll = [newComment, ...allComments];
-        setAllComments(updatedAll);
-
-        // 정렬 기준에 따라 리스트 갱신
         const sorted = sortData(updatedAll, sortBy);
         setAllComments(sorted);
-
-        // 화면에 즉시 반영 (맨 앞에 추가하거나 정렬 다시 해서 반영)
-        // 여기서는 간단히 displayedComments 맨 앞에 추가하여 즉시 피드백 제공
         setDisplayedComments(prev => [newComment, ...prev]);
 
         setInputText('');
         Keyboard.dismiss();
-
-        // 스크롤 최상단 이동
         listRef.current?.scrollToOffset({ offset: 0, animated: true });
     };
 
-    const handleEditQuestion = () => {
-        Alert.alert('알림', '질문 수정 화면으로 이동합니다.');
-    };
+
 
     const handleDeleteQuestion = () => {
-        Alert.alert(
-            '질문 삭제',
-            '정말로 이 질문을 삭제하시겠습니까?',
-            [
-                { text: '취소', style: 'cancel' },
-                { text: '삭제', style: 'destructive', onPress: () => navigation.goBack() }
-            ]
-        );
+        setModalConfig({
+            title: '질문 삭제',
+            message: '정말로 이 질문을 삭제하시겠습니까?',
+            onConfirm: () => {
+                setModalVisible(false);
+                navigation.goBack();
+            },
+            onCancel: () => setModalVisible(false),
+            cancelText: '취소'
+        });
+        setModalVisible(true);
     };
 
     const renderHeader = () => {
         if (!question) return null;
         return (
             <View>
-                {/* 질문 본문 */}
                 <View style={styles.questionSection}>
                     <Text style={styles.title}>{question.title}</Text>
                     <View style={styles.authorRow}>
@@ -140,7 +142,6 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                     </View>
                 </View>
 
-                {/* 댓글 섹션 헤더 */}
                 <View style={styles.commentHeader}>
                     <Text style={styles.commentCount}>댓글 {allComments.length}</Text>
                     <View style={styles.sortContainer}>
@@ -211,14 +212,23 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                     <ChevronLeft size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <View style={styles.headerRight}>
-                    <TouchableOpacity onPress={handleEditQuestion} style={styles.headerActionBtn}>
-                        <Text style={styles.headerActionText}>수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleDeleteQuestion} style={styles.headerActionBtn}>
-                        <Text style={[styles.headerActionText, { color: theme.colors.error }]}>삭제</Text>
-                    </TouchableOpacity>
+                    {question.author === '본인사용자' && (
+                        <TouchableOpacity onPress={handleDeleteQuestion} style={[styles.headerActionBtn, styles.deleteBtn]}>
+                            <Trash2 size={14} color={theme.colors.error} />
+                            <Text style={styles.headerActionText}>삭제</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
+
+            <CustomModal
+                visible={modalVisible}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                onConfirm={modalConfig.onConfirm}
+                onCancel={modalConfig.onCancel}
+                cancelText={modalConfig.cancelText}
+            />
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
@@ -239,7 +249,6 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                     removeClippedSubviews={true}
                 />
 
-                {/* 댓글 입력창 */}
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.textInput}
@@ -260,7 +269,6 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                 </View>
             </KeyboardAvoidingView>
 
-            {/* 플로팅 버튼 */}
             <View style={styles.fabContainer}>
                 <TouchableOpacity
                     style={styles.fab}
@@ -296,24 +304,26 @@ const styles = StyleSheet.create({
     backButton: {
         padding: theme.spacing.xs,
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: theme.colors.text,
-    },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
     },
     headerActionBtn: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 4,
+    },
+    deleteBtn: {
+        backgroundColor: '#FFF0F0', // 아주 연한 빨강
     },
     headerActionText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: theme.colors.textLight,
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: theme.colors.error,
     },
     listContent: {
         backgroundColor: theme.colors.background,
@@ -474,7 +484,7 @@ const styles = StyleSheet.create({
     },
     fabContainer: {
         position: 'absolute',
-        bottom: 160, // 입력창 위로 충분히 올림
+        bottom: 120,
         right: 20,
         gap: 12,
     },
@@ -505,7 +515,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
         borderRadius: 20,
         paddingHorizontal: theme.spacing.md,
-        paddingVertical: 8, // 높이 고정보다는 패딩으로 조절
+        paddingVertical: 8,
         maxHeight: 100,
         fontSize: 14,
         color: theme.colors.text,

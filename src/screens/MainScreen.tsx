@@ -2,12 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
+import { supabase } from '../lib/supabase';
 import { MOCK_QUESTIONS, Question } from '../data/mockData';
-import { Heart, MessageCircle, ChevronRight, Flame, PenLine } from 'lucide-react-native';
+import { Heart, MessageCircle, ChevronRight, Flame, PenLine, LogOut } from 'lucide-react-native';
 import { isToday, subDays, startOfDay } from 'date-fns';
 
 export const MainScreen = ({ navigation }: any) => {
     const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
+
+    const handleLogout = async () => {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+        } catch (error: any) {
+            console.error('Logout error:', error.message);
+        }
+    };
 
     // 인기 질문 필터링 로직
     const getPopularQuestions = () => {
@@ -66,10 +76,18 @@ export const MainScreen = ({ navigation }: any) => {
         <SafeAreaView style={styles.safeArea}>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>CoupleQ</Text>
-                    <TouchableOpacity style={styles.profileButton}>
-                        <Heart size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>속닥속닥</Text>
+                    <View style={styles.headerRight}>
+                        <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
+                            <LogOut size={22} color={theme.colors.textLight} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.profileButton}
+                            onPress={() => navigation.navigate('Profile')}
+                        >
+                            <Heart size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* 첫 번째 섹션: 인기 질문 */}
@@ -169,8 +187,16 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: theme.colors.primary,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    iconButton: {
+        padding: 8,
+    },
     profileButton: {
-        padding: theme.spacing.sm,
+        padding: 8,
     },
     section: {
         padding: theme.spacing.md,
