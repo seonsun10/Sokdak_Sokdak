@@ -13,16 +13,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { ChevronLeft, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MOCK_QUESTIONS, Question } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 import { CustomModal } from '../components/CustomModal';
+import { useUserStore } from '../store/useUserStore';
 
 export const WriteQuestionScreen = ({ route, navigation }: any) => {
     const insets = useSafeAreaInsets();
 
-    const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
+    const { isEdit, questionId, initialTitle, initialContent, initialTags } = route.params || {};
+
+    const [title, setTitle] = useState(initialTitle || '');
+    const [content, setContent] = useState(initialContent || '');
     const [tagInput, setTagInput] = useState('');
-    const [tags, setTags] = useState<string[]>([]);
+    const [tags, setTags] = useState<string[]>(initialTags || []);
 
     // 유효성 검사 에러 상태
     const [errors, setErrors] = useState({ title: false, content: false });
@@ -30,7 +33,19 @@ export const WriteQuestionScreen = ({ route, navigation }: any) => {
 
     // 커스텀 모달 상태
     const [modalVisible, setModalVisible] = useState(false);
-    const [modalConfig, setModalConfig] = useState({ title: '', message: '', onConfirm: () => {} });
+    const [modalConfig, setModalConfig] = useState<{
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        onCancel?: () => void;
+    }>({ 
+        title: '', 
+        message: '', 
+        onConfirm: () => {},
+        onCancel: undefined
+    });
+
+    const { profile, session } = useUserStore();
 
     // 포커스 제어를 위한 Ref
     const titleRef = useRef<TextInput>(null);
@@ -47,7 +62,8 @@ export const WriteQuestionScreen = ({ route, navigation }: any) => {
             setModalConfig({
                 title: '알림',
                 message: '태그는 최대 5개까지만 추가할 수 있습니다.',
-                onConfirm: () => setModalVisible(false)
+                onConfirm: () => setModalVisible(false),
+                onCancel: undefined
             });
             setModalVisible(true);
             return;
@@ -57,7 +73,8 @@ export const WriteQuestionScreen = ({ route, navigation }: any) => {
             setModalConfig({
                 title: '알림',
                 message: '이미 추가된 태그입니다.',
-                onConfirm: () => setModalVisible(false)
+                onConfirm: () => setModalVisible(false),
+                onCancel: undefined
             });
             setModalVisible(true);
             setTagInput('');
@@ -99,33 +116,64 @@ export const WriteQuestionScreen = ({ route, navigation }: any) => {
         }
 
         try {
-            // 등록 로직
-            const newQuestion: Question = {
-                id: `new-${Date.now()}`,
-                title: title.trim(),
-                content: content.trim(),
-                author: '본인사용자', // 임시 사용자
-                commentCount: 0,
-                createdAt: new Date(),
-                tags: tags
-            };
+            if (!session?.user) throw new Error('로그인이 필요합니다.');
 
-            MOCK_QUESTIONS.unshift(newQuestion);
-            
-            setModalConfig({
-                title: '등록 완료',
-                message: '새로운 질문이 등록되었습니다.',
-                onConfirm: () => {
-                    setModalVisible(false);
-                    navigation.replace('QuestionDetail', { questionId: newQuestion.id });
-                }
-            });
+            const authorName = profile?.nickname || '새로운 유저';
+
+            if (isEdit) {
+                const { error } = await supabase
+                    .from('questions')
+                    .update({
+                        title: title.trim(),
+                        content: content.trim(),
+                        tags: tags
+                    })
+                    .eq('id', questionId);
+
+                if (error) throw error;
+
+                setModalConfig({
+                    title: '수정 완료',
+                    message: '질문이 성공적으로 수정되었습니다.',
+                    onConfirm: () => {
+                        setModalVisible(false);
+                        navigation.goBack(); // 수정 후 상세 페이지로 복귀 (상세 페이지에서 refetch 할 것)
+                    },
+                    onCancel: undefined
+                });
+            } else {
+                const { data, error } = await supabase
+                    .from('questions')
+                    .insert({
+                        title: title.trim(),
+                        content: content.trim(),
+                        author_id: session.user.id,
+                        author_name: authorName,
+                        tags: tags
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                
+                setModalConfig({
+                    title: '등록 완료',
+                    message: '새로운 질문이 등록되었습니다.',
+                    onConfirm: () => {
+                        setModalVisible(false);
+                        navigation.replace('QuestionDetail', { questionId: data.id });
+                    },
+                    onCancel: undefined
+                });
+            }
             setModalVisible(true);
-        } catch (e) {
+        } catch (e: any) {
+            console.error('Error saving question:', e);
             setModalConfig({
                 title: '오류',
-                message: '게시글 등록에 실패했습니다.',
-                onConfirm: () => setModalVisible(false)
+                message: e.message || '저장에 실패했습니다.',
+                onConfirm: () => setModalVisible(false),
+                onCancel: undefined
             });
             setModalVisible(true);
         }
@@ -137,9 +185,9 @@ export const WriteQuestionScreen = ({ route, navigation }: any) => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <ChevronLeft size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>질문하기</Text>
+                <Text style={styles.headerTitle}>{isEdit ? '질문 수정' : '질문하기'}</Text>
                 <TouchableOpacity onPress={handleComplete} style={styles.completeButton}>
-                    <Text style={styles.completeButtonText}>완료</Text>
+                    <Text style={styles.completeButtonText}>{isEdit ? '저장' : '완료'}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -148,6 +196,7 @@ export const WriteQuestionScreen = ({ route, navigation }: any) => {
                 title={modalConfig.title}
                 message={modalConfig.message}
                 onConfirm={modalConfig.onConfirm}
+                onCancel={modalConfig.onCancel}
             />
 
             <KeyboardAvoidingView

@@ -3,12 +3,25 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { supabase } from '../lib/supabase';
-import { MOCK_QUESTIONS, Question } from '../data/mockData';
 import { Heart, MessageCircle, ChevronRight, Flame, PenLine, LogOut } from 'lucide-react-native';
-import { isToday, subDays, startOfDay } from 'date-fns';
+import { isToday, subDays, startOfDay, formatISO } from 'date-fns';
+import { RefreshControl } from 'react-native';
+
+interface DBQuestion {
+    id: string;
+    title: string;
+    author_name: string;
+    created_at: string;
+    comments?: { count: number }[];
+    commentCount?: number; // 클라이언트 측에서 계산된 댓글 수
+}
 
 export const MainScreen = ({ navigation }: any) => {
     const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
+    const [popularQuestions, setPopularQuestions] = useState<DBQuestion[]>([]);
+    const [recentQuestions, setRecentQuestions] = useState<DBQuestion[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const handleLogout = async () => {
         try {
@@ -19,35 +32,74 @@ export const MainScreen = ({ navigation }: any) => {
         }
     };
 
-    // 인기 질문 필터링 로직
-    const getPopularQuestions = () => {
-        const now = new Date();
-        const filtered = MOCK_QUESTIONS.filter(q => {
-            if (activeTab === 'today') {
-                return isToday(q.createdAt);
-            } else if (activeTab === 'week') {
-                return q.createdAt >= subDays(startOfDay(now), 7);
-            } else if (activeTab === 'month') {
-                return q.createdAt >= subDays(startOfDay(now), 30);
-            }
-            return true;
-        });
+    const fetchData = async (isRefresh = false) => {
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
 
-        // 댓글 수 기준 정렬 후 상위 5개
-        return [...filtered]
-            .sort((a, b) => b.commentCount - a.commentCount)
-            .slice(0, 5);
+        try {
+            const now = new Date();
+            let startDate;
+            if (activeTab === 'today') startDate = startOfDay(now);
+            else if (activeTab === 'week') startDate = subDays(startOfDay(now), 7);
+            else startDate = subDays(startOfDay(now), 30);
+
+            // 1. 인기 질문 페칭 (댓글 수 포함)
+            const { data: popularData, error: popularError } = await supabase
+                .from('questions')
+                .select('id, title, author_name, created_at, comments(count)')
+                .gte('created_at', formatISO(startDate))
+                .limit(50); // 정렬을 위해 일단 넉넉히 가져옴
+
+            if (popularError) throw popularError;
+
+            // 서브쿼리 개수 기준으로 클라이언트 측 정렬 및 상위 5개 추출
+            const sortedPopular = (popularData || [])
+                .map(q => ({
+                    ...q,
+                    commentCount: q.comments?.[0]?.count || 0
+                }))
+                .sort((a, b) => b.commentCount - a.commentCount)
+                .slice(0, 5);
+            
+            setPopularQuestions(sortedPopular as any);
+
+            // 2. 최신 질문 페칭
+            const { data: recentData, error: recentError } = await supabase
+                .from('questions')
+                .select('id, title, author_name, created_at, comments(count)')
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (recentError) throw recentError;
+
+            const formattedRecent = (recentData || []).map(q => ({
+                ...q,
+                commentCount: q.comments?.[0]?.count || 0
+            }));
+
+            setRecentQuestions(formattedRecent as any);
+
+        } catch (error) {
+            console.error('MainScreen data fetching error:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     };
 
-    const popularQuestions = getPopularQuestions();
-    const hotQuestionId = popularQuestions.length > 0 ? popularQuestions[0].id : null;
+    useEffect(() => {
+        fetchData();
+    }, [activeTab]);
 
-    // 두 번째 섹션 (최신 질문) - 날짜 기준 정렬
-    const recentQuestions = [...MOCK_QUESTIONS]
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        .slice(0, 5);
+    const onRefresh = () => {
+        fetchData(true);
+    };
 
-    const renderQuestionItem = (item: Question, isHot: boolean = false) => (
+    const hotQuestionId = (popularQuestions.length > 0 && (popularQuestions[0].commentCount || 0) > 0) 
+        ? popularQuestions[0].id 
+        : null;
+
+    const renderQuestionItem = (item: any, isHot: boolean = false) => (
         <TouchableOpacity
             key={item.id}
             style={styles.questionCard}
@@ -63,10 +115,10 @@ export const MainScreen = ({ navigation }: any) => {
                 ) : null}
             </View>
             <View style={styles.questionFooter}>
-                <Text style={styles.authorText}>{item.author}</Text>
+                <Text style={styles.authorText}>{item.author_name}</Text>
                 <View style={styles.commentInfo}>
                     <MessageCircle size={14} color={theme.colors.textLight} />
-                    <Text style={styles.commentCountText}>{item.commentCount}</Text>
+                    <Text style={styles.commentCountText}>{item.commentCount || 0}</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -74,21 +126,27 @@ export const MainScreen = ({ navigation }: any) => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>속닥속닥</Text>
-                    <View style={styles.headerRight}>
-                        <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
-                            <LogOut size={22} color={theme.colors.textLight} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.profileButton}
-                            onPress={() => navigation.navigate('Profile')}
-                        >
-                            <Heart size={24} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                    </View>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>속닥속닥</Text>
+                <View style={styles.headerRight}>
+                    <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
+                        <LogOut size={22} color={theme.colors.textLight} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.profileButton}
+                        onPress={() => navigation.navigate('Profile')}
+                    >
+                        <Heart size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
                 </View>
+            </View>
+            <ScrollView 
+                style={styles.container} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+                }
+            >
 
                 {/* 첫 번째 섹션: 인기 질문 */}
                 <View style={styles.section}>
@@ -116,18 +174,21 @@ export const MainScreen = ({ navigation }: any) => {
                             popularQuestions.map((q) => renderQuestionItem(q, q.id === hotQuestionId))
                         ) : (
                             <View style={styles.emptyCard}>
-                                <Text style={styles.emptyText}>선택한 기간에 등록된 질문이 없어요. 🌸</Text>
+                                <Text style={styles.emptyText}>등록된 질문이 없어요.</Text>
+                                <Text style={styles.emptySubText}>가장 먼저 질문을 올려보세요 🌸</Text>
                             </View>
                         )}
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.moreButton}
-                        onPress={() => navigation.navigate('QuestionList', { type: 'popular', tab: activeTab })}
-                    >
-                        <Text style={styles.moreButtonText}>더보기</Text>
-                        <ChevronRight size={16} color={theme.colors.textLight} />
-                    </TouchableOpacity>
+                    {popularQuestions.length > 0 && (
+                        <TouchableOpacity
+                            style={styles.moreButton}
+                            onPress={() => navigation.navigate('QuestionList', { type: 'popular', tab: activeTab })}
+                        >
+                            <Text style={styles.moreButtonText}>더보기</Text>
+                            <ChevronRight size={16} color={theme.colors.textLight} />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.divider} />
@@ -139,16 +200,25 @@ export const MainScreen = ({ navigation }: any) => {
                     </View>
 
                     <View style={styles.listContainer}>
-                        {recentQuestions.map((q) => renderQuestionItem(q))}
+                        {recentQuestions.length > 0 ? (
+                            recentQuestions.map((q) => renderQuestionItem(q))
+                        ) : (
+                            <View style={styles.emptyCard}>
+                                <Text style={styles.emptyText}>등록된 질문이 없어요.</Text>
+                                <Text style={styles.emptySubText}>가장 먼저 질문을 올려보세요 🌸</Text>
+                            </View>
+                        )}
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.moreButton}
-                        onPress={() => navigation.navigate('QuestionList', { type: 'recent' })}
-                    >
-                        <Text style={styles.moreButtonText}>더보기</Text>
-                        <ChevronRight size={16} color={theme.colors.textLight} />
-                    </TouchableOpacity>
+                    {recentQuestions.length > 0 && (
+                        <TouchableOpacity
+                            style={styles.moreButton}
+                            onPress={() => navigation.navigate('QuestionList', { type: 'recent' })}
+                        >
+                            <Text style={styles.moreButtonText}>더보기</Text>
+                            <ChevronRight size={16} color={theme.colors.textLight} />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={{ height: 40 }} />
@@ -317,9 +387,16 @@ const styles = StyleSheet.create({
         borderColor: theme.colors.border,
     },
     emptyText: {
-        fontSize: 14,
+        fontSize: 15,
+        color: theme.colors.text,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    emptySubText: {
+        fontSize: 12,
         color: theme.colors.textLight,
         textAlign: 'center',
+        marginTop: 4,
     },
     fabContainer: {
         position: 'absolute',

@@ -5,6 +5,7 @@ import { theme } from '../styles/theme';
 import { supabase } from '../lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import { handleAuthRedirect } from '../utils/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -18,7 +19,6 @@ export const LoginScreen = () => {
             const redirectUrl = AuthSession.makeRedirectUri({
                 path: 'auth/callback',
             });
-            console.log("Supabase에 등록할 정확한 URL:", redirectUrl);
             
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider,
@@ -40,8 +40,13 @@ export const LoginScreen = () => {
             if (!data?.url) throw new Error('인증 URL을 생성할 수 없습니다.');
 
             // 브라우저 세션 열기
-            await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-            // 결과 처리는 App.tsx의 전역 딥링크 리스너에서 통합 처리됩니다.
+            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+            
+            // 안드로이드/에뮬레이터 환경에서 리스너 유실 방지를 위해 직접 결과 URL 처리
+            if (result.type === 'success' && result.url) {
+                await handleAuthRedirect(result.url);
+            }
+
             
         } catch (error: any) {
             Alert.alert('로그인 오류', error.message || '로그인 중 오류가 발생했습니다.');

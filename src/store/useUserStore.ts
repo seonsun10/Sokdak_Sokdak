@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { Session } from '@supabase/supabase-js';
 
 interface Profile {
   id: string;
@@ -10,15 +11,18 @@ interface Profile {
 
 interface UserState {
   profile: Profile | null;
+  session: Session | null;
   isLoadingProfile: boolean;
   fetchProfile: (userId: string) => Promise<void>;
   setProfile: (profile: Profile | null) => void;
+  setSession: (session: Session | null) => void;
   updateNickname: (nickname: string) => void;
   clearProfile: () => void;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
   profile: null,
+  session: null,
   isLoadingProfile: false,
 
   fetchProfile: async (userId: string) => {
@@ -41,6 +45,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   setProfile: (profile) => set({ profile }),
 
+  setSession: (session) => {
+    set({ session });
+  },
+
   updateNickname: (nickname) => {
     const currentProfile = get().profile;
     if (currentProfile) {
@@ -48,5 +56,5 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  clearProfile: () => set({ profile: null }),
+  clearProfile: () => set({ profile: null, session: null }),
 }));

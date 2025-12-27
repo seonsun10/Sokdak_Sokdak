@@ -2,58 +2,110 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
-import { MOCK_QUESTIONS, Question } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 import { ChevronLeft, MessageCircle, Flame } from 'lucide-react-native';
-import { isToday, subDays, startOfDay } from 'date-fns';
+import { isToday, subDays, startOfDay, formatISO } from 'date-fns';
+
+const PAGE_SIZE = 10;
+
+interface DBQuestion {
+    id: string;
+    title: string;
+    author_name: string;
+    created_at: string;
+    commentCount: number;
+}
 
 export const QuestionListScreen = ({ route, navigation }: any) => {
     const { type, tab: initialTab } = route.params; // initialTab은 초기 진입 시 설정용, 이후 내부 state로 관리
 
     const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>(initialTab || 'today');
-    const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-    const [displayedQuestions, setDisplayedQuestions] = useState<Question[]>([]);
+    const [questions, setQuestions] = useState<DBQuestion[]>([]);
+    const [loading, setLoading] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [page, setPage] = useState(1);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
 
     const title = type === 'popular' ? '인기 질문' : '최신 질문';
 
-    useEffect(() => {
-        // 필터링 및 정렬 로직
-        const filtered = MOCK_QUESTIONS.filter(q => {
+    const fetchQuestions = async (pageNum: number) => {
+        try {
+            if (pageNum === 0) setLoading(true);
+            else setLoadingMore(true);
+
+            const from = pageNum * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
+
+            let query = supabase
+                .from('questions')
+                .select('id, title, author_name, created_at, comments(count)');
+
+            // 1. 유형별 필터링/정렬
             if (type === 'popular') {
                 const now = new Date();
-                if (activeTab === 'today') return isToday(q.createdAt);
-                if (activeTab === 'week') return q.createdAt >= subDays(startOfDay(now), 7);
-                if (activeTab === 'month') return q.createdAt >= subDays(startOfDay(now), 30);
-            }
-            return true;
-        }).sort((a, b) => {
-            if (type === 'popular') return b.commentCount - a.commentCount;
-            return b.createdAt.getTime() - a.createdAt.getTime();
-        });
+                let startDate;
+                if (activeTab === 'today') startDate = startOfDay(now);
+                else if (activeTab === 'week') startDate = subDays(startOfDay(now), 7);
+                else startDate = subDays(startOfDay(now), 30);
 
-        setAllQuestions(filtered);
-        setDisplayedQuestions(filtered.slice(0, 10));
-        setPage(1);
+                query = query.gte('created_at', formatISO(startDate));
+                
+                // 인기 질문은 클라이언트 사이드 정렬을 위해 조금 더 많이 가져옴 (간이 페이징)
+                // 실제 고도화 시에는 RPC 또는 View를 사용하는 것이 좋지만 일단 메인과 동일 기조 유지
+                const { data, error } = await query.limit(100); 
+                if (error) throw error;
+
+                const sorted = (data || [])
+                    .map(q => ({
+                        ...q,
+                        commentCount: q.comments?.[0]?.count || 0
+                    }))
+                    .sort((a, b) => b.commentCount - a.commentCount);
+
+                const sliced = sorted.slice(from, to + 1);
+                setQuestions(prev => pageNum === 0 ? sliced : [...prev, ...sliced]);
+                setHasMore(sorted.length > to + 1);
+
+            } else {
+                // 최신순 페이징
+                query = query
+                    .order('created_at', { ascending: false })
+                    .range(from, to);
+
+                const { data, error } = await query;
+                if (error) throw error;
+
+                if (data) {
+                    const formatted = data.map(q => ({
+                        ...q,
+                        commentCount: q.comments?.[0]?.count || 0
+                    }));
+                    setQuestions(prev => pageNum === 0 ? formatted : [...prev, ...formatted]);
+                    setHasMore(data.length === PAGE_SIZE);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching questions:', error);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchQuestions(0);
+        setPage(0);
     }, [type, activeTab]);
 
     const handleLoadMore = () => {
-        if (loadingMore || displayedQuestions.length >= allQuestions.length) return;
-
-        setLoadingMore(true);
-        setTimeout(() => {
-            const nextBatch = allQuestions.slice(page * 10, (page + 1) * 10);
-            if (nextBatch.length > 0) {
-                setDisplayedQuestions(prev => [...prev, ...nextBatch]);
-                setPage(p => p + 1);
-            }
-            setLoadingMore(false);
-        }, 500);
+        if (loading || loadingMore || !hasMore) return;
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchQuestions(nextPage);
     };
 
-    const renderItem = ({ item, index }: { item: Question, index: number }) => {
-        // 인기 질문이면서 첫 번째 항목인 경우 Hot 배지 표시 (단, 필터링 된 목록 내에서)
-        const isHot = type === 'popular' && index === 0 && displayedQuestions.length > 0;
+    const renderItem = ({ item, index }: { item: any, index: number }) => {
+        const isHot = type === 'popular' && index === 0 && questions.length > 0 && (item.commentCount || 0) > 0;
 
         return (
             <TouchableOpacity
@@ -70,9 +122,9 @@ export const QuestionListScreen = ({ route, navigation }: any) => {
                     )}
                 </View>
                 <View style={styles.footer}>
-                    <Text style={styles.author}>{item.author}</Text>
+                    <Text style={styles.author}>{item.author_name}</Text>
                     <View style={styles.footerRight}>
-                        <Text style={styles.date}>{item.createdAt.toLocaleDateString()}</Text>
+                        <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
                         <View style={styles.commentInfo}>
                             <MessageCircle size={14} color={theme.colors.textLight} />
                             <Text style={styles.commentCount}>{item.commentCount}</Text>
@@ -120,7 +172,7 @@ export const QuestionListScreen = ({ route, navigation }: any) => {
             </View>
 
             <FlatList
-                data={displayedQuestions}
+                data={questions}
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.list}
@@ -129,7 +181,8 @@ export const QuestionListScreen = ({ route, navigation }: any) => {
                 ListFooterComponent={renderFooter}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>해당 기간에 등록된 질문이 없어요. 🌸</Text>
+                        <Text style={styles.emptyText}>등록된 질문이 없어요.</Text>
+                        <Text style={styles.emptySubText}>가장 먼저 질문을 올려보세요 🌸</Text>
                     </View>
                 }
             />
@@ -265,7 +318,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyText: {
+        fontSize: 16,
+        color: theme.colors.text,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    emptySubText: {
+        fontSize: 13,
         color: theme.colors.textLight,
-        fontSize: 14,
+        textAlign: 'center',
+        marginTop: 6,
     },
 });

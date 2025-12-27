@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { theme } from '../styles/theme';
 import { useNavigation } from '@react-navigation/native';
@@ -162,6 +163,98 @@ export const ProfileScreen = () => {
       setIsUpdating(false);
     }
   };
+  
+  // 4. 이미지 선택 및 업로드 함수
+  const pickImage = async () => {
+    try {
+      // 갤러리 권한 요청
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 오류', '갤러리 접근 권한이 필요합니다.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.3, // 🆕 용량 문제 해결을 위해 압축률 강화 (0.5 -> 0.3)
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Pick image error:', error);
+      Alert.alert('오류', '이미지를 선택하는 중 문제가 발생했습니다.');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    if (!user) return;
+    
+    try {
+      setIsUpdating(true);
+      
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+      const contentType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+
+      // [핵심] React Native에서 가장 안정적인 FormData 방식 도입
+      // Supabase Storage JS 라이브러리는 RN 환경에서 FormData를 지원합니다.
+      const formData = new FormData();
+      formData.append('file', {
+        uri: uri,
+        name: fileName,
+        type: contentType,
+      } as any);
+
+      // Supabase Storage 업로드
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, formData, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: contentType
+        });
+
+      if (uploadError) {
+        console.error('Supabase Upload Error:', uploadError);
+        if (uploadError.message.includes('exceeded the maximum allowed size')) {
+          Alert.alert('용량 초과', '이미지 파일이 너무 큽니다. Supabase 스토리지 설정에서 제한을 늘리거나 더 작은 사진을 선택해주세요.');
+        } else {
+          throw uploadError;
+        }
+        return;
+      }
+
+      // Public URL 가져오기
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // profiles 테이블 업데이트
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 전역 스토어 업데이트
+      if (profile) {
+        useUserStore.getState().setProfile({ ...profile, avatar_url: publicUrl });
+      }
+      
+      Alert.alert('성공', '프로필 사진이 변경되었습니다.');
+    } catch (error: any) {
+      console.error('Upload error details:', error);
+      Alert.alert('오류', '사진 업로드에 실패했습니다. (네트워크 상태를 확인해주세요)');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const startEditing = () => {
     setNewNickname(profile?.nickname || '');
@@ -215,17 +308,32 @@ export const ProfileScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderHeader = () => (
+  const memoizedHeader = useMemo(() => (
     <View style={styles.headerComponent}>
       <View style={styles.profileSection}>
-        <View style={styles.avatarContainer}>
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.placeholderAvatar]}>
-              <Ionicons name="person" size={40} color="#CCC" />
+        <View style={styles.avatarWrapper}>
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            onPress={pickImage}
+            disabled={isUpdating}
+          >
+            {profile?.avatar_url ? (
+              <Image 
+                source={{ uri: profile.avatar_url }} 
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            ) : (
+              <Image 
+                source={require('../../assets/default_profile.png')} 
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            )}
+            <View style={styles.cameraButton}>
+              <Ionicons name="camera" size={20} color="#FFF" />
             </View>
-          )}
+          </TouchableOpacity>
         </View>
         
         {isEditingNickname ? (
@@ -294,7 +402,7 @@ export const ProfileScreen = () => {
         </TouchableOpacity>
       </View>
     </View>
-  );
+  ), [profile, isEditingNickname, newNickname, counts, isUpdating, activeTab, user]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -315,7 +423,8 @@ export const ProfileScreen = () => {
         data={activeTab === 'questions' ? (questions as any[]) : (comments as any[])}
         renderItem={activeTab === 'questions' ? renderQuestionItem as any : renderCommentItem as any}
         keyExtractor={item => item.id}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={memoizedHeader}
+        keyboardShouldPersistTaps="handled"
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         contentContainerStyle={styles.listContent}
@@ -386,18 +495,35 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  avatarContainer: {
+  avatarWrapper: {
     marginBottom: 16,
+    position: 'relative',
+  },
+  avatarContainer: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    position: 'relative',
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: theme.colors.primary,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFF',
   },
   placeholderAvatar: {
     backgroundColor: '#F8F8F8',

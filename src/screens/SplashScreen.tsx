@@ -1,16 +1,43 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Dimensions, StatusBar, Image } from 'react-native';
 import { theme } from '../styles/theme';
 
+const { width } = Dimensions.get('window');
+
 export const SplashScreen = () => {
+    const textFadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(textFadeAnim, {
+            toValue: 1,
+            duration: 800,
+            delay: 300,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={theme.colors.surface} />
             <View style={styles.logoContainer}>
-                {/* 임시 로고 텍스트 */}
-                <Text style={styles.logoText}>🌸</Text>
-                <Text style={styles.brandName}>속닥속닥</Text>
+                <Image 
+                    source={require('../../assets/splash_bg.png')} 
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                />
+                <Image 
+                    source={require('../../assets/sokdak_logo_bg_x.png')} 
+                    style={styles.brandLogoImage}
+                    resizeMode="contain"
+                />
             </View>
-            <Text style={styles.loadingText}>속닥속닥, 우리들만의 이야기를 준비하는 중...</Text>
+            
+            <Animated.View style={[styles.footer, { opacity: textFadeAnim }]}>
+                <Text style={styles.loadingText}>당신만의 따뜻한 공간을 준비하고 있어요</Text>
+                <View style={styles.progressBarContainer}>
+                    <View style={styles.progressBar} />
+                </View>
+            </Animated.View>
         </View>
     );
 };
@@ -18,26 +45,46 @@ export const SplashScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.primary,
+        backgroundColor: theme.colors.surface,
         alignItems: 'center',
         justifyContent: 'center',
     },
     logoContainer: {
         alignItems: 'center',
-        marginBottom: theme.spacing.xl,
     },
-    logoText: {
-        fontSize: 80,
-        marginBottom: theme.spacing.sm,
+    logoImage: {
+        width: 360,
+        height: 360,
+        marginBottom: 20,
     },
-    brandName: {
-        fontSize: 40,
-        fontWeight: 'bold',
-        color: theme.colors.surface,
+    brandLogoImage: {
+        width: 180,
+        height: 60,
+        marginTop: 10,
+    },
+    footer: {
+        position: 'absolute',
+        bottom: 100,
+        alignItems: 'center',
+        width: '100%',
     },
     loadingText: {
-        color: theme.colors.surface,
-        fontSize: 16,
-        opacity: 0.9,
+        color: theme.colors.textLight,
+        fontSize: 15,
+        fontWeight: '500',
+        marginBottom: 16,
+    },
+    progressBarContainer: {
+        width: width * 0.5,
+        height: 4,
+        backgroundColor: theme.colors.border,
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    progressBar: {
+        width: '60%', // 정적 표시, 실제 로딩 진행률 연동 가능
+        height: '100%',
+        backgroundColor: theme.colors.primary,
+        borderRadius: 2,
     },
 });
