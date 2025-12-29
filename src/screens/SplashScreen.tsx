@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, StatusBar, Image } from 'react-native';
 import { theme } from '../styles/theme';
+import { styles } from './styles/SplashScreen.styles';
 
 const { width } = Dimensions.get('window');
 
@@ -18,16 +19,10 @@ export const SplashScreen = () => {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={theme.colors.surface} />
             <View style={styles.logoContainer}>
                 <Image 
                     source={require('../../assets/splash_bg.png')} 
                     style={styles.logoImage}
-                    resizeMode="contain"
-                />
-                <Image 
-                    source={require('../../assets/sokdak_logo_bg_x.png')} 
-                    style={styles.brandLogoImage}
                     resizeMode="contain"
                 />
             </View>
@@ -42,49 +37,3 @@ export const SplashScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: theme.colors.surface,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    logoContainer: {
-        alignItems: 'center',
-    },
-    logoImage: {
-        width: 360,
-        height: 360,
-        marginBottom: 20,
-    },
-    brandLogoImage: {
-        width: 180,
-        height: 60,
-        marginTop: 10,
-    },
-    footer: {
-        position: 'absolute',
-        bottom: 100,
-        alignItems: 'center',
-        width: '100%',
-    },
-    loadingText: {
-        color: theme.colors.textLight,
-        fontSize: 15,
-        fontWeight: '500',
-        marginBottom: 16,
-    },
-    progressBarContainer: {
-        width: width * 0.5,
-        height: 4,
-        backgroundColor: theme.colors.border,
-        borderRadius: 2,
-        overflow: 'hidden',
-    },
-    progressBar: {
-        width: '60%', // 정적 표시, 실제 로딩 진행률 연동 가능
-        height: '100%',
-        backgroundColor: theme.colors.primary,
-        borderRadius: 2,
-    },
-});

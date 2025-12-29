@@ -9,6 +9,7 @@ import { ChevronLeft, MessageCircle, Heart, Trash2, ArrowUp, List, Send, Pencil,
 import { format } from 'date-fns';
 import { CustomModal } from '../components/CustomModal';
 import { useUserStore } from '../store/useUserStore';
+import { styles } from './styles/QuestionDetailScreen.styles';
 
 interface DBComment {
     id: string;
@@ -44,6 +45,7 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(0);
     const [inputText, setInputText] = useState('');
+    const [isCommentsInitialLoaded, setIsCommentsInitialLoaded] = useState(false);
 
     // 댓글 수정 관련 상태
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -85,8 +87,7 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
 
     const fetchComments = async (pageNum: number) => {
         try {
-            if (pageNum === 0) setLoading(false); // 질문 상세 로딩이 있으므로 댓글 첫 로딩은 별도 표시 안 함
-            else setLoadingMore(true);
+            if (pageNum !== 0) setLoadingMore(true);
 
             const from = pageNum * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
@@ -109,6 +110,7 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                 setComments(prev => pageNum === 0 ? data : [...prev, ...data]);
                 setHasMore(data.length === PAGE_SIZE);
             }
+            if (pageNum === 0) setIsCommentsInitialLoaded(true);
         } catch (error) {
             console.error('Error fetching comments:', error);
         } finally {
@@ -179,6 +181,7 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
     const handleCancelEditComment = () => {
         setEditingCommentId(null);
         setEditCommentText('');
+        Keyboard.dismiss();
     };
 
     const handleUpdateComment = async (commentId: string) => {
@@ -196,6 +199,7 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                 c.id === commentId ? { ...c, content: editCommentText.trim() } : c
             ));
             handleCancelEditComment();
+            Keyboard.dismiss();
         } catch (error) {
             console.error('Error updating comment:', error);
             Alert.alert('오류', '댓글 수정에 실패했습니다.');
@@ -378,13 +382,16 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
         );
     };
 
-    const renderEmpty = () => (
-        <View style={styles.emptyContainer}>
-            <MessageCircle size={48} color={theme.colors.border} />
-            <Text style={styles.emptyText}>아직 등록된 댓글이 없어요.</Text>
-            <Text style={styles.emptySubText}>첫 번째 의견을 남겨보세요! 🌸</Text>
-        </View>
-    );
+    const renderEmpty = () => {
+        if (!isCommentsInitialLoaded) return null;
+        return (
+            <View style={styles.emptyContainer}>
+                <MessageCircle size={48} color={theme.colors.border} />
+                <Text style={styles.emptyText}>아직 등록된 댓글이 없어요.</Text>
+                <Text style={styles.emptySubText}>첫 번째 의견을 남겨보세요! 🌸</Text>
+            </View>
+        );
+    };
 
     const renderFooter = () => {
         if (!loadingMore) return <View style={{ height: 100 }} />;
@@ -395,8 +402,6 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
             </View>
         );
     };
-
-    if (!question) return null;
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -429,332 +434,73 @@ export const QuestionDetailScreen = ({ route, navigation }: any) => {
                 cancelText={modalConfig.cancelText}
             />
 
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 60 + insets.top : 0}
-            >
-                <FlatList
-                    ref={listRef}
-                    data={comments}
-                    renderItem={renderComment}
-                    keyExtractor={(item) => item.id}
-                    ListHeaderComponent={renderHeader}
-                    ListEmptyComponent={renderEmpty}
-                    ListFooterComponent={renderFooter}
-                    contentContainerStyle={styles.listContent}
-                    onEndReached={handleLoadMore}
-                    onEndReachedThreshold={0.3}
-                    removeClippedSubviews={true}
-                />
-
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.textInput}
-                        placeholder="따뜻한 댓글을 남겨주세요..."
-                        placeholderTextColor={theme.colors.textLight}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        multiline
-                        maxLength={200}
+            {loading && !question ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                </View>
+            ) : !question ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: theme.colors.textLight }}>질문을 찾을 수 없습니다.</Text>
+                </View>
+            ) : (
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 60 + insets.top : 0}
+                >
+                    <FlatList
+                        ref={listRef}
+                        data={comments}
+                        renderItem={renderComment}
+                        keyExtractor={(item) => item.id}
+                        ListHeaderComponent={renderHeader}
+                        ListEmptyComponent={renderEmpty}
+                        ListFooterComponent={renderFooter}
+                        contentContainerStyle={styles.listContent}
+                        onEndReached={handleLoadMore}
+                        onEndReachedThreshold={0.3}
+                        removeClippedSubviews={true}
+                        keyboardShouldPersistTaps="handled"
                     />
+
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="따뜻한 댓글을 남겨주세요..."
+                            placeholderTextColor={theme.colors.textLight}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            multiline
+                            maxLength={200}
+                        />
+                        <TouchableOpacity
+                            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                            onPress={handleSend}
+                            disabled={!inputText.trim()}
+                        >
+                            <Send size={16} color={theme.colors.surface} />
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
+            )}
+
+            {question && (
+                <View style={styles.fabContainer}>
                     <TouchableOpacity
-                        style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                        onPress={handleSend}
-                        disabled={!inputText.trim()}
+                        style={styles.fab}
+                        onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
                     >
-                        <Send size={16} color={theme.colors.surface} />
+                        <ArrowUp size={24} color={theme.colors.surface} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.fab}
+                        onPress={() => navigation.navigate('Main')}
+                    >
+                        <List size={24} color={theme.colors.surface} />
                     </TouchableOpacity>
                 </View>
-            </KeyboardAvoidingView>
-
-            <View style={styles.fabContainer}>
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
-                >
-                    <ArrowUp size={24} color={theme.colors.surface} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={() => navigation.navigate('Main')}
-                >
-                    <List size={24} color={theme.colors.surface} />
-                </TouchableOpacity>
-            </View>
+            )}
         </SafeAreaView>
     );
 };
 
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: theme.colors.background,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: theme.spacing.md,
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-    },
-    backButton: {
-        padding: theme.spacing.xs,
-    },
-    headerRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    headerActionBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-        gap: 4,
-    },
-    deleteBtn: {
-        backgroundColor: '#FFF0F0', // 아주 연한 빨강
-    },
-    editBtn: {
-        backgroundColor: theme.colors.primaryLight,
-    },
-    headerActionTextEdit: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: theme.colors.primary,
-    },
-    headerActionText: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: theme.colors.error,
-    },
-    listContent: {
-        backgroundColor: theme.colors.background,
-    },
-    questionSection: {
-        padding: theme.spacing.lg,
-        backgroundColor: theme.colors.surface,
-        marginBottom: theme.spacing.sm,
-    },
-    title: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: theme.colors.text,
-        marginBottom: theme.spacing.sm,
-    },
-    authorRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: theme.spacing.md,
-    },
-    author: {
-        fontSize: 14,
-        color: theme.colors.primary,
-        fontWeight: '600',
-    },
-    date: {
-        fontSize: 12,
-        color: theme.colors.textLight,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: theme.colors.border,
-        marginBottom: theme.spacing.md,
-    },
-    content: {
-        fontSize: 16,
-        lineHeight: 24,
-        color: theme.colors.text,
-        marginBottom: theme.spacing.lg,
-    },
-    tagContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: theme.spacing.sm,
-    },
-    tag: {
-        backgroundColor: theme.colors.primaryLight,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: theme.borderRadius.full,
-    },
-    tagText: {
-        fontSize: 12,
-        color: theme.colors.primary,
-        fontWeight: '500',
-    },
-    commentHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: theme.spacing.md,
-        backgroundColor: theme.colors.background,
-    },
-    commentCount: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: theme.colors.text,
-    },
-    sortContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    sortText: {
-        fontSize: 13,
-        color: theme.colors.textLight,
-    },
-    activeSortText: {
-        color: theme.colors.primary,
-        fontWeight: 'bold',
-    },
-    sortDivider: {
-        marginHorizontal: 8,
-        color: theme.colors.border,
-    },
-    commentItem: {
-        backgroundColor: theme.colors.surface,
-        padding: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-        marginBottom: theme.spacing.sm,
-        marginHorizontal: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-    },
-    commentTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: theme.spacing.xs,
-    },
-    commentAuthor: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: theme.colors.text,
-    },
-    commentActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    likeButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    likeCount: {
-        fontSize: 12,
-        color: theme.colors.textLight,
-    },
-    deleteButton: {
-        padding: 2,
-    },
-    actionIconButton: {
-        padding: 4,
-    },
-    editActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    editInput: {
-        fontSize: 14,
-        color: theme.colors.text,
-        backgroundColor: theme.colors.background,
-        borderRadius: 8,
-        padding: 8,
-        marginVertical: 4,
-        borderWidth: 1,
-        borderColor: theme.colors.primary,
-    },
-    commentContent: {
-        fontSize: 14,
-        color: theme.colors.text,
-        lineHeight: 20,
-        marginBottom: theme.spacing.xs,
-    },
-    commentDate: {
-        fontSize: 10,
-        color: theme.colors.textLight,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 60,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: theme.colors.text,
-        fontWeight: '600',
-        marginTop: theme.spacing.sm,
-    },
-    emptySubText: {
-        fontSize: 14,
-        color: theme.colors.textLight,
-        marginTop: 4,
-    },
-    footerLoader: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: theme.spacing.lg,
-        gap: 8,
-    },
-    loadingMoreText: {
-        fontSize: 14,
-        color: theme.colors.textLight,
-    },
-    fabContainer: {
-        position: 'absolute',
-        bottom: 120,
-        right: 20,
-        gap: 12,
-    },
-    fab: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: theme.colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: theme.spacing.md,
-        backgroundColor: theme.colors.surface,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-        paddingBottom: Platform.OS === 'ios' ? theme.spacing.md : theme.spacing.md,
-    },
-    textInput: {
-        flex: 1,
-        backgroundColor: theme.colors.background,
-        borderRadius: 20,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: 8,
-        maxHeight: 100,
-        fontSize: 14,
-        color: theme.colors.text,
-        marginRight: theme.spacing.sm,
-    },
-    sendButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: theme.colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    sendButtonDisabled: {
-        backgroundColor: theme.colors.border,
-    },
-});

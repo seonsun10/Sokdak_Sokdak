@@ -1,0 +1,275 @@
+import { StyleSheet, Platform } from 'react-native';
+import { theme } from '../../styles/theme';
+
+export const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+    },
+    backButton: {
+        padding: theme.spacing.xs,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    headerActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 4,
+    },
+    deleteBtn: {
+        backgroundColor: '#FFF0F0',
+    },
+    editBtn: {
+        backgroundColor: theme.colors.primaryLight,
+    },
+    headerActionTextEdit: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: theme.colors.primary,
+    },
+    headerActionText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: theme.colors.error,
+    },
+    listContent: {
+        backgroundColor: theme.colors.background,
+    },
+    questionSection: {
+        padding: theme.spacing.lg,
+        backgroundColor: theme.colors.surface,
+        marginBottom: theme.spacing.sm,
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        marginBottom: theme.spacing.sm,
+    },
+    authorRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: theme.spacing.md,
+    },
+    author: {
+        fontSize: 14,
+        color: theme.colors.primary,
+        fontWeight: '600',
+    },
+    date: {
+        fontSize: 12,
+        color: theme.colors.textLight,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: theme.colors.border,
+        marginBottom: theme.spacing.md,
+    },
+    content: {
+        fontSize: 16,
+        lineHeight: 24,
+        color: theme.colors.text,
+        marginBottom: theme.spacing.lg,
+    },
+    tagContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: theme.spacing.sm,
+    },
+    tag: {
+        backgroundColor: theme.colors.primaryLight,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: theme.borderRadius.full,
+    },
+    tagText: {
+        fontSize: 12,
+        color: theme.colors.primary,
+        fontWeight: '500',
+    },
+    commentHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.background,
+    },
+    commentCount: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+    },
+    sortContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    sortText: {
+        fontSize: 13,
+        color: theme.colors.textLight,
+    },
+    activeSortText: {
+        color: theme.colors.primary,
+        fontWeight: 'bold',
+    },
+    sortDivider: {
+        marginHorizontal: 8,
+        color: theme.colors.border,
+    },
+    commentItem: {
+        backgroundColor: theme.colors.surface,
+        padding: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        marginBottom: theme.spacing.sm,
+        marginHorizontal: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    commentTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: theme.spacing.xs,
+    },
+    commentAuthor: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: theme.colors.text,
+    },
+    commentActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    likeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    likeCount: {
+        fontSize: 12,
+        color: theme.colors.textLight,
+    },
+    deleteButton: {
+        padding: 2,
+    },
+    actionIconButton: {
+        padding: 4,
+    },
+    editActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    editInput: {
+        fontSize: 14,
+        color: theme.colors.text,
+        backgroundColor: theme.colors.background,
+        borderRadius: 8,
+        padding: 8,
+        marginVertical: 4,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+    },
+    commentContent: {
+        fontSize: 14,
+        color: theme.colors.text,
+        lineHeight: 20,
+        marginBottom: theme.spacing.xs,
+    },
+    commentDate: {
+        fontSize: 10,
+        color: theme.colors.textLight,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 60,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: theme.colors.text,
+        fontWeight: '600',
+        marginTop: theme.spacing.sm,
+    },
+    emptySubText: {
+        fontSize: 14,
+        color: theme.colors.textLight,
+        marginTop: 4,
+    },
+    footerLoader: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: theme.spacing.lg,
+        gap: 8,
+    },
+    loadingMoreText: {
+        fontSize: 14,
+        color: theme.colors.textLight,
+    },
+    fabContainer: {
+        position: 'absolute',
+        bottom: 120,
+        right: 20,
+        gap: 12,
+    },
+    fab: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.border,
+        paddingBottom: Platform.OS === 'ios' ? theme.spacing.md : theme.spacing.md,
+    },
+    textInput: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        borderRadius: 20,
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: 8,
+        maxHeight: 100,
+        fontSize: 14,
+        color: theme.colors.text,
+        marginRight: theme.spacing.sm,
+    },
+    sendButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    sendButtonDisabled: {
+        backgroundColor: theme.colors.border,
+    },
+});
